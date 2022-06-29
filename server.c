@@ -44,8 +44,9 @@ void *connection_handler(void *socket_desc) // recebe o endereco do socket
 {
     int request;
     char client_reply[BUFFER_SIZE], *request_lines[3];
-    char *file_name;
     char *extension;
+    char *file_name;
+    
 
     // recebe o socket descritor
     int sock = *((int *)socket_desc);
