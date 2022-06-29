@@ -152,11 +152,11 @@ int main(int argc, char *argv[])
     struct sockaddr_in server, client;
 
     socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-    /* if (socket_desc == -1)
+    if (socket_desc == -1)
     {
-        puts("deu erro ao criar o socket leozinho");
+        puts("deu erro ao criar o socket");
         return 1;
-    }*/
+    }
 
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
