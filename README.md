@@ -2,9 +2,9 @@
 ## Nome dos integrantes do grupo: 
 Ignacio Garcia, Guilherme Goulart e Thomas Benfica.
 
-## Para compilar o projeto digite o seguinte comando dentro do diretorio do projeto:
-sudo su
-make run
+## Para compilar o projeto digite os seguintes comandos dentro do diretorio do projeto:
+- `sudo su`
+- `make run`
 
 ## Para fazer requests para o servidor, acesse o seguinte link usando o navegador:
 http://localhost:8080/teste.html
