@@ -1,202 +1,186 @@
-#include "headerFiles.h"
-#include <stdbool.h>
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<netdb.h>
+#include<signal.h>
+#include<fcntl.h>
+#include<pthread.h>
 
-#define PATH "/home/wanakin/Projetos/C-C++/http-server" // caminho do repositorio
-#define PORT_NO 8888                                    // numero da porta
-#define BUFFER_SIZE 1024                                // tamanho do buffer
-#define CONNECTION_NUMBER 10                            // numero de conexoes simultaneas
+#define CONNMAX 20
+#define BYTES 1024
+int slot=0;
 
-int thread_count = 0; // faz a contagem das threads simultaneas ativas no momento
-sem_t mutex;          // semaforo pra controlar a condicao de corrida
+char *ROOT;
+int listenfd, clients[CONNMAX], contador=0;
+void error(char *);
+void startServer(char *);
+void respond(int);
+void *cback(void *void_ptr);
 
-void html_handler(int socket, char *file_name) // handler de arquivos html
+int main(int argc, char* argv[])
 {
-    char *buffer;
-    char *full_path = (char *)malloc((strlen(PATH) + strlen(file_name)) * sizeof(char)); // alocacao do caminho completo
-    FILE *fp;                                                                            // handler de arquivos
+	struct sockaddr_in clientaddr;
+	socklen_t addrlen;
+	char c;    
+	
+	//Default Values PATH = ~/ and PORT=10000
+	char PORT[6];
+	ROOT = getenv("PWD");
+	strcpy(PORT,"8080");
 
-    strcpy(full_path, PATH);      // joga o caminho do diretorio raiz dentro do full path
-    strcat(full_path, file_name); // concatena o caminho com o nome do arquivo
-
-    fp = fopen(full_path, "r"); // abre o arquivo modo leitura
-    if (fp != NULL)             // achou o arquivo
-    {
-        puts("achei o arquivo.");
-
-        fseek(fp, 0, SEEK_END);      // encontra o tamanho do arquivo
-        long bytes_read = ftell(fp); // salvando o tamanho do arquivo
-        fseek(fp, 0, SEEK_SET);
-        send(socket, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n", 44, 0); // manda o header com mensagem de sucesso
-        buffer = (char *)malloc(bytes_read * sizeof(char));                        // aloca o numero de bytes lidos e guarda no buffer
-        fread(buffer, bytes_read, 1, fp);
-        write(socket, buffer, bytes_read); // envia o conteudo do html pro cliente
-        free(buffer);
-        fclose(fp);
-    }
-    else // caso nao for encontrado o arquivo
-    {
-        write(socket, "HTTP/1.0 404 Not Found\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n<!doctype html><html><body>404 File Not Found</body></html>", strlen("HTTP/1.0 404 Not Found\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n<!doctype html><html><body>404 File Not Found</body></html>"));
-    }
-
-    free(full_path); // libera a memoria alocada pro caminho completo
-}
-
-void *connection_handler(void *socket_desc) // recebe o endereco do socket
-{
-	printf("hand");
-	int request;
-	char client_reply[BUFFER_SIZE], *request_lines[3];
-	char *extension;
-	char *file_name;
-
-	// recebe o socket descritor
-	int sock = *((int *)socket_desc);
-
-	// recebe a request
-	request = recv(sock, client_reply, BUFFER_SIZE, 0);
-	sem_wait(&mutex);
-	thread_count++;
-
-	if (thread_count > 10) // mantem dentro do limite de threads, caso o limite seja ultrapassado entra aqui
-	{
-		char *message = "HTTP/1.0 400 Bad Request\r\nContent-Type: text/html\r\n\r\n<!doctype html><html><body>System is busy right now.</body></html>";
-		write(sock, message, strlen(message));
-		thread_count--;
-		sem_post(&mutex);
-		free(socket_desc);
-		shutdown(sock, SHUT_RDWR);
-		close(sock);
-		sock = -1;
-		pthread_exit(NULL);
-	}
-	sem_post(&mutex);
-
-	if(false);
-	else // recv deu bom
-	{
-		clock_t start_t, end_t = 0;
-		double time_taken;
-		start_t = clock();
-		printf("1");
-		do
+	//Parsing the command line arguments
+	while ((c = getopt (argc, argv, "p:r:")) != -1)
+		switch (c)
 		{
-			printf("2");
-			if((request = recv(sock, client_reply, BUFFER_SIZE, 0)) < 0)
-					printf("problema");
-			if (client_reply > 0)
-			{
-				printf("%s", client_reply);
-				request_lines[0] = strtok(client_reply, " \t\n");
-				if (strncmp(request_lines[0], "GET\0", 4) == 0)
-				{
-					// analisa o cabecalho do request
-					request_lines[1] = strtok(NULL, " \t");
-					request_lines[2] = strtok(NULL, " \t\n");
+			case 'r':
+				ROOT = malloc(strlen(optarg));
+				strcpy(ROOT,optarg);
+				break;
+			case 'p':
+				strcpy(PORT,optarg);
+				break;
+			case '?':
+				fprintf(stderr,"Parametros errados cpx\n");
+				exit(1);
+			default:
+				exit(1);
+		}
+	
+	printf("SERVER TA TIPO NEYMAR. %s%s%s PATH: %s%s%s\n","\033[92m",PORT,"\033[0m","\033[92m",ROOT,"\033[0m");
+	// Setting all elements to -1: signifies there is no client connected
+	int i;
+	for (i=0; i<CONNMAX; i++)
+		clients[i]=-1;
+	startServer(PORT);
+	pthread_t thread;
+	// ACCEPT connections
+	 for (int y=0; y<CONNMAX; y++)                //while(1)
+	{
+		
+		addrlen = sizeof(clientaddr);
+		clients[slot] = accept (listenfd, (struct sockaddr *) &clientaddr, &addrlen);
 
-					if (strncmp(request_lines[2], "HTTP/1.1", 8) != 0) // da ruim se nao for http/1.1
-					{
-						char *message = "HTTP/1.0 400 Bad Request\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n<!doctype html><html><body>400 Bad Request</body></html>";
-						write(sock, message, strlen(message));
-					}
-					else
-					{
-						char *tokens[2]; // para fazer a analise do arquivo e do tipo
-
-						file_name = (char *)malloc(strlen(request_lines[1]) * sizeof(char));
-						strcpy(file_name, request_lines[1]);
-						puts(file_name);
-
-						// pega o nome do arquivo e o tipo
-						tokens[0] = strtok(file_name, ".");
-						tokens[1] = strtok(NULL, ".");
-
-						if (tokens[0] == NULL || tokens[1] == NULL) // se nao existe uma extensao no arquivo
-						{
-							char *message = "HTTP/1.0 400 Bad Request\r\nConnection: close\r\n\r\n<!doctype html><html><body>400 Bad Request. (You need to request html files)</body></html>";
-							write(sock, message, strlen(message));
-						}
-						else
-						{
-
-							if (strcmp(tokens[1], "html") != 0)
-							{
-								char *message = "HTTP/1.0 400 Bad Request\r\nConnection: close\r\n\r\n<!doctype html><html><body>400 Bad Request. Not Supported File Type (Suppoerted File Types: html and jpeg)</body></html>";
-								write(sock, message, strlen(message));
-							}
-							else
-							{
-								if (strcmp(tokens[1], "html") == 0) // chama o handler de html
-								{
-									sem_wait(&mutex); // cria uma condicao de corrida
-									html_handler(sock, request_lines[1]);
-									sem_post(&mutex);
-								}
-							}
-						}
-						free(file_name);
-					}
+		if (clients[slot]<0)
+			error ("Erro ao aceitar a conexao");
+		else
+		{
+				
+				if(pthread_create(&thread, NULL, cback, NULL) ==0){
+				respond(slot);
 				}
-				start_t = clock();
-			}
-			strcpy(client_reply, "");
-			printf("%f",((double)clock() - start_t) / CLOCKS_PER_SEC);
-		} while (((double)clock() - start_t) / CLOCKS_PER_SEC < 5);
-		printf("tempo expirado");
-	}
-	free(socket_desc); // libera memoria, desliga a thread e diminui o contador de threads.
-	shutdown(sock, SHUT_RDWR);
-	close(sock);
-	sock = -1;
-	sem_wait(&mutex);
-	thread_count--;
-	sem_post(&mutex);
+				
+					
+				
+			
+		}
+		close(clients[slot]);
+		 slot = (slot+1)%CONNMAX;
+	} 
 	pthread_exit(NULL);
+	
+	return 0;
 }
 
-int main(int argc, char *argv[])
+void *cback(void *void_ptr)
 {
-    // inicializando os semaforos
-    sem_init(&mutex, 0, 1);
-    int socket_desc, new_socket, c, *new_sock;
-    struct sockaddr_in server, client;
+}
 
-    socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_desc == -1)
-    {
-        puts("deu erro ao criar o socket");
-        return 1;
-    }
+//inicia o server
+void startServer(char *port)
+{
+	struct addrinfo hints, *res, *p;
 
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons(PORT_NO);
-    int True = 1;
-    setsockopt(socket_desc,SOL_SOCKET,SO_REUSEADDR,&True,sizeof(int));
+	// getaddrinfo do host
+	memset (&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	if (getaddrinfo( NULL, port, &hints, &res) != 0)
+	{
+		perror ("Erro ao receber o enderecamento");
+		exit(1);
+	}
+	// socket and bind
+	for (p = res; p!=NULL; p=p->ai_next)
+	{
+		listenfd = socket (p->ai_family, p->ai_socktype, 0);
+		if (listenfd == -1) break;
+		if (bind(listenfd, p->ai_addr, p->ai_addrlen) == 0) break;
+	}
+	if (p==NULL)
+	{
+		perror ("Erro no socket() ou bind()");
+		close(listenfd);
+		exit(1);
+	}
 
-    if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) // faz o bind
-    {
-        puts("falhou o bind");
-        return 1;
-    }
+	freeaddrinfo(res);
 
-    listen(socket_desc, 20); // bota o socket para ouvir
+	// listen for incoming connections
+	if ( listen (listenfd, 20) != 0 )
+	{
+		perror("Erro na espera por novas conexoes");
+		exit(1);
+	}
+	
+	
 
-    puts("esperando as conexao");
-    c = sizeof(struct sockaddr_in);
-    while ((new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&c))) // espera ate aceitar uma conexao
-    {
-        puts("conexao aceita\n");
+}
 
-        pthread_t sniffer_thread;
-        new_sock = malloc(1);
-        *new_sock = new_socket;
+//client connection
+void respond(int n)
+{
+	char mesg[99999], *reqline[3], data_to_send[BYTES], path[99999];
+	int rcvd, fd, bytes_read;
 
-        if (pthread_create(&sniffer_thread, NULL, connection_handler, (void *)new_sock) < 0) // a cada request, cria uma thread
-        {
-            puts("nao deu pra cria a thread"); // erro ao criar a thread
-            return 1;
-        }
-    }
+	memset( (void*)mesg, (int)'\0', 99999 );
 
-    return 0;
+	rcvd=recv(clients[n], mesg, 99999, 0);
+
+	if (rcvd<0)    // receive error
+		fprintf(stderr,("Erro no recebimento\n"));
+	else if (rcvd==0)    // receive socket closed
+		fprintf(stderr,"Conexão encerrada, socket desconectado\n");
+	else    // message received
+	{
+		printf("%s", mesg);
+		reqline[0] = strtok (mesg, " \t\n");
+		if ( strncmp(reqline[0], "GET\0", 4)==0 )
+		{
+			reqline[1] = strtok (NULL, " \r\n");
+			reqline[2] = strtok (NULL, " \t\n");
+			if ( strncmp( reqline[2], "HTTP/1.1", 8)!=0 && strncmp( reqline[2], "HTTP/1.0", 8)!=0 )
+			{
+				write(clients[n], "HTTP/1.0 400 Bad Request\n", 25);
+			}
+			else
+			{
+				if ( strncmp(reqline[1], "/\0", 2)==0 )
+					reqline[1] = "/index.html";        //Because if no file is specified, index.html will be opened by default (like it happens in APACHE...
+
+				strcpy(path, ROOT);
+				strcpy(&path[strlen(ROOT)], reqline[1]);
+				printf("file: %s\n", path);
+
+				if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
+				{
+					send(clients[n], "HTTP/1.0 200 OK\n\n", 17, 0);
+					//printf("HTTP/1.0 200 OK\n\n");
+					while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
+						write (clients[n], data_to_send, bytes_read);
+				}
+				else    write(clients[n], "HTTP/1.0 404 Not Found\n", 23); //FILE NOT FOUND
+			}
+		}
+	}
+
+	//Closing SOCKET
+	shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
+	close(clients[n]);
+	clients[n]=-1;
 }
