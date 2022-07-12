@@ -1,0 +1,111 @@
+html{
+    background-color: rgb(212, 212, 212);
+
+}
+
+header{
+    text-align: center;
+}
+
+.fixed-bar{
+    height: 60px;
+}
+
+.navigation{
+    text-align: center;
+    padding-left: 0;
+    margin: 10px;
+
+}
+
+.navigation li, .navigation a{
+    font-size: 17px;
+display: inline-block;
+width: 70px;
+}
+
+.feedback{
+position: relative;
+bottom: 30px;
+margin: 0;
+height: 30px;
+font-size: 25px;
+background-color: black;
+color: white;
+text-align: center;
+}
+
+.comment-mng{
+    flex-wrap: wrap;
+background-color: white;
+border: 1px black solid;
+display: flex;
+align-items: center;
+margin: 5px 0;
+justify-content: center;
+}
+
+.comment-mng img{
+border-radius: 70%;
+font-size: 22px;
+width: 100px;
+}
+
+.comment-mng p{
+    text-align: center;
+    width: 350px;
+    }
+
+body{
+    margin: 0;
+}
+
+footer{
+    padding: 0 3px;
+}
+
+.page-title{
+    margin: 0;
+    padding: 0;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    background-color: #000;
+    padding: 8px;
+    font-size: 40px;
+    color: white;
+}
+
+li{
+    padding: 0 1.5px;
+}
+
+a{
+
+    text-decoration: none;
+    color: black;
+    background-color: whitesmoke;
+    border: black groove 1px;
+}
+.trip-text{
+    display: flex;
+    background-color: black;
+    padding: 3px;
+}
+.trip-text p{
+    text-align: center;
+    margin: 0;
+    color: whitesmoke;
+    width: 50%;
+}
+
+.trip-images{
+    display: flex;
+}
+
+.trip-images img{
+    width: 1000px;
+    height: 500px;
+}
+
+
