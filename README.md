@@ -11,4 +11,4 @@ http://localhost:8080/index.html
 ## Este projeto foi desenvolvido integralmente pela equipe, sem ajuda não autorizada de alunos não membros do projeto no processo de codificação.
 
 ## O codigo utilizado como base pode ser encontrado em:
-https://github.com/ericomeehan/libeom/blob/main/test/main.c
+https://dzone.com/articles/web-server-c
