@@ -10,6 +10,7 @@
 #include<signal.h>
 #include<fcntl.h>
 #include<pthread.h>
+#include<semaphore.h>
 
 #define CONNMAX 20
 #define BYTES 1024
@@ -19,7 +20,7 @@ char *ROOT;
 int listenfd, clients[CONNMAX], contador=0;
 void error(char *);
 void startServer(char *);
-void respond(int);
+void respond(int*);
 void *cback(void *void_ptr);
 
 int main(int argc, char* argv[])
@@ -58,10 +59,9 @@ int main(int argc, char* argv[])
 		clients[i]=-1;
 	startServer(PORT);
 	pthread_t thread;
+	void (*respond_pointer)(int*) = &respond;
 	// ACCEPT connections
-	 for (int y=0; y<CONNMAX; y++)                //while(1)
-	{
-		
+	for (int y=0; y<CONNMAX; y++){
 		addrlen = sizeof(clientaddr);
 		clients[slot] = accept (listenfd, (struct sockaddr *) &clientaddr, &addrlen);
 
@@ -69,17 +69,16 @@ int main(int argc, char* argv[])
 			error ("Erro ao aceitar a conexao");
 		else
 		{
-				
-				if(pthread_create(&thread, NULL, cback, NULL) ==0){
-				respond(slot);
-				}
-				
-					
-				
-			
+			int addr = slot;
+
+			pthread_create(&thread, NULL, (void*)(respond_pointer), &addr);
+
+			// if(pthread_create(&thread, NULL, cback, NULL) ==0){
+			// 	respond(slot);
+			// }
+			slot = (slot + 1) % CONNMAX;
 		}
-		close(clients[slot]);
-		 slot = (slot+1)%CONNMAX;
+		// close(clients[slot]);
 	} 
 	pthread_exit(NULL);
 	
@@ -88,6 +87,7 @@ int main(int argc, char* argv[])
 
 void *cback(void *void_ptr)
 {
+
 }
 
 //inicia o server
@@ -100,6 +100,9 @@ void startServer(char *port)
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
+
+	// setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+
 	if (getaddrinfo( NULL, port, &hints, &res) != 0)
 	{
 		perror ("Erro ao receber o enderecamento");
@@ -127,14 +130,13 @@ void startServer(char *port)
 		perror("Erro na espera por novas conexoes");
 		exit(1);
 	}
-	
-	
-
 }
 
 //client connection
-void respond(int n)
+void respond(int* addr)
 {
+	int n = *addr;
+	// n -= 1;
 	char mesg[99999], *reqline[3], data_to_send[BYTES], path[99999];
 	int rcvd, fd, bytes_read;
 
